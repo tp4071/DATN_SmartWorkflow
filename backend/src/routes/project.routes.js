@@ -39,6 +39,12 @@ router.put('/:id', requireAdmin, ProjectController.update);
 // PUT /api/projects/:id/close
 router.put('/:id/close', requireAdmin, ProjectController.close);
 
+// PUT /api/projects/:id/reopen
+router.put('/:id/reopen', requireAdmin, ProjectController.reopen);
+
+// PUT /api/projects/:id/archive
+router.put('/:id/archive', requireAdmin, ProjectController.archive);
+
 // ====== PM: quản lý thành viên dự án ======
 // GET /api/projects/:projectId/members
 //  - Mọi thành viên dự án đều được xem list (read-only).

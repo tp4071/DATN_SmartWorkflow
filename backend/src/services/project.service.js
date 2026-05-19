@@ -173,3 +173,44 @@ export const closeProject = async (id) => {
   }
   return updated;
 };
+
+/**
+ * Mở lại dự án (ADMIN). Cho phép từ 'Đóng' hoặc 'Lưu trữ' về 'Đang hoạt động'.
+ * Chặn nếu đã 'Đang hoạt động' để báo lỗi rõ thay vì âm thầm no-op.
+ */
+export const reopenProject = async (id) => {
+  const existing = await ProjectRepository.findById(id);
+  if (!existing) {
+    throw createError('Không tìm thấy dự án', 404);
+  }
+
+  if (existing.status === 'Đang hoạt động') {
+    throw createError('Dự án đang ở trạng thái hoạt động', 400);
+  }
+
+  const updated = await ProjectRepository.updateStatus(id, 'Đang hoạt động');
+  if (!updated) {
+    throw createError('Không tìm thấy dự án', 404);
+  }
+  return updated;
+};
+
+/**
+ * Đưa dự án vào lưu trữ (ADMIN). Cho phép từ 'Đang hoạt động' hoặc 'Đóng'.
+ */
+export const archiveProject = async (id) => {
+  const existing = await ProjectRepository.findById(id);
+  if (!existing) {
+    throw createError('Không tìm thấy dự án', 404);
+  }
+
+  if (existing.status === 'Lưu trữ') {
+    throw createError('Dự án đã ở trạng thái lưu trữ', 400);
+  }
+
+  const updated = await ProjectRepository.updateStatus(id, 'Lưu trữ');
+  if (!updated) {
+    throw createError('Không tìm thấy dự án', 404);
+  }
+  return updated;
+};

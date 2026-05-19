@@ -17,9 +17,11 @@ import {
 } from '../../components/ui'
 import { ROUTE_PATHS } from '../../router/paths'
 import {
+  archiveProject,
   closeProject,
   createProject,
   listProjects,
+  reopenProject,
   updateProject,
 } from '../../services/projects.api'
 import { ProjectFormModal } from './ProjectFormModal'
@@ -64,7 +66,13 @@ export function AdminProjectsPage() {
   const [statusFilter, setStatusFilter] = useState('ALL')
 
   const [formState, setFormState] = useState({ open: false, mode: 'create', project: null })
-  const [confirmState, setConfirmState] = useState({ open: false, project: null, busy: false })
+  // action: 'close' | 'reopen' | 'archive'
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    project: null,
+    action: 'close',
+    busy: false,
+  })
 
   const fetchProjects = useCallback(async () => {
     setLoading(true)
@@ -135,22 +143,44 @@ export function AdminProjectsPage() {
     closeForm()
   }
 
-  const askClose = (project) => setConfirmState({ open: true, project, busy: false })
-  const closeConfirm = () => setConfirmState({ open: false, project: null, busy: false })
+  const askStatusChange = (project, action) =>
+    setConfirmState({ open: true, project, action, busy: false })
+  const closeConfirm = () =>
+    setConfirmState({ open: false, project: null, action: 'close', busy: false })
 
-  const handleConfirmClose = async () => {
+  // Mapping action -> { api, successMsg, errorMsg } để 1 dialog xử lý cả 3 case.
+  const ACTION_MAP = {
+    close: {
+      api: closeProject,
+      successMsg: 'Đã đóng dự án',
+      errorMsg: 'Không đóng được dự án.',
+    },
+    reopen: {
+      api: reopenProject,
+      successMsg: 'Đã mở lại dự án',
+      errorMsg: 'Không mở lại được dự án.',
+    },
+    archive: {
+      api: archiveProject,
+      successMsg: 'Đã đưa dự án vào lưu trữ',
+      errorMsg: 'Không lưu trữ được dự án.',
+    },
+  }
+
+  const handleConfirmAction = async () => {
     const target = confirmState.project
-    if (!target) return
+    const action = confirmState.action
+    if (!target || !ACTION_MAP[action]) return
     setConfirmState((s) => ({ ...s, busy: true }))
     try {
-      const updated = await closeProject(target.id)
+      const updated = await ACTION_MAP[action].api(target.id)
       setProjects((arr) =>
         arr.map((p) => (p.id === updated.id ? { ...p, status: updated.status } : p)),
       )
-      toast.success('Đã đóng dự án')
+      toast.success(ACTION_MAP[action].successMsg)
       closeConfirm()
     } catch (err) {
-      toast.error(err.message || 'Không đóng được dự án.')
+      toast.error(err.message || ACTION_MAP[action].errorMsg)
       setConfirmState((s) => ({ ...s, busy: false }))
     }
   }
@@ -249,7 +279,9 @@ export function AdminProjectsPage() {
             </thead>
             <tbody className="text-sm divide-y divide-neutral-200">
               {filtered.map((p, idx) => {
+                const isActive = p.status === 'Đang hoạt động'
                 const isClosed = p.status === 'Đóng'
+                const isArchived = p.status === 'Lưu trữ'
                 return (
                   <tr key={p.id} className="hover:bg-primary-50 transition-colors group">
                     <td className="px-4 py-3 text-center text-on-surface-variant">{idx + 1}</td>
@@ -301,15 +333,39 @@ export function AdminProjectsPage() {
                         >
                           <Icon name="edit" className="text-[20px]" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => askClose(p)}
-                          disabled={isClosed}
-                          className="p-1.5 rounded transition-colors text-danger-500 hover:bg-danger-50 disabled:text-neutral-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
-                          title={isClosed ? 'Dự án đã đóng' : 'Đóng dự án'}
-                        >
-                          <Icon name="cancel" className="text-[20px]" />
-                        </button>
+                        {/* Mở lại — chỉ hiện khi đang Đóng hoặc Lưu trữ */}
+                        {!isActive ? (
+                          <button
+                            type="button"
+                            onClick={() => askStatusChange(p, 'reopen')}
+                            className="p-1.5 rounded transition-colors text-success-600 hover:bg-success-50"
+                            title="Mở lại dự án"
+                          >
+                            <Icon name="play_circle" className="text-[20px]" />
+                          </button>
+                        ) : null}
+                        {/* Đóng — chỉ hiện khi Đang hoạt động */}
+                        {isActive ? (
+                          <button
+                            type="button"
+                            onClick={() => askStatusChange(p, 'close')}
+                            className="p-1.5 rounded transition-colors text-danger-500 hover:bg-danger-50"
+                            title="Đóng dự án"
+                          >
+                            <Icon name="cancel" className="text-[20px]" />
+                          </button>
+                        ) : null}
+                        {/* Lưu trữ — ẩn khi đã ở Lưu trữ */}
+                        {!isArchived ? (
+                          <button
+                            type="button"
+                            onClick={() => askStatusChange(p, 'archive')}
+                            className="p-1.5 rounded transition-colors text-tertiary-700 hover:bg-tertiary-50"
+                            title="Đưa vào lưu trữ"
+                          >
+                            <Icon name="inventory_2" className="text-[20px]" />
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -332,13 +388,35 @@ export function AdminProjectsPage() {
         open={confirmState.open}
         loading={confirmState.busy}
         onClose={closeConfirm}
-        onConfirm={handleConfirmClose}
-        tone="danger"
-        title="Đóng dự án"
-        confirmLabel="Đóng dự án"
+        onConfirm={handleConfirmAction}
+        tone={
+          confirmState.action === 'reopen'
+            ? 'success'
+            : confirmState.action === 'archive'
+              ? 'warning'
+              : 'danger'
+        }
+        title={
+          confirmState.action === 'reopen'
+            ? 'Mở lại dự án'
+            : confirmState.action === 'archive'
+              ? 'Đưa vào lưu trữ'
+              : 'Đóng dự án'
+        }
+        confirmLabel={
+          confirmState.action === 'reopen'
+            ? 'Mở lại'
+            : confirmState.action === 'archive'
+              ? 'Lưu trữ'
+              : 'Đóng dự án'
+        }
         message={
           confirmState.project
-            ? `Bạn có chắc chắn muốn đóng dự án "${confirmState.project.name}"?\nDự án bị đóng sẽ không nhận thêm thay đổi mới.`
+            ? confirmState.action === 'reopen'
+              ? `Mở lại dự án "${confirmState.project.name}"?\nDự án sẽ trở về trạng thái Đang hoạt động, PM và thành viên có thể tiếp tục làm việc.`
+              : confirmState.action === 'archive'
+                ? `Đưa "${confirmState.project.name}" vào lưu trữ?\nDự án vẫn xem được nhưng được tách khỏi danh sách hoạt động.`
+                : `Bạn có chắc chắn muốn đóng dự án "${confirmState.project.name}"?\nDự án bị đóng sẽ không nhận thêm thay đổi mới.`
             : ''
         }
       />

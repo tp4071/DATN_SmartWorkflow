@@ -44,3 +44,13 @@ export async function closeProject(id) {
   const res = await request(`/api/projects/${id}/close`, { method: 'PUT' })
   return res?.data
 }
+
+export async function reopenProject(id) {
+  const res = await request(`/api/projects/${id}/reopen`, { method: 'PUT' })
+  return res?.data
+}
+
+export async function archiveProject(id) {
+  const res = await request(`/api/projects/${id}/archive`, { method: 'PUT' })
+  return res?.data
+}

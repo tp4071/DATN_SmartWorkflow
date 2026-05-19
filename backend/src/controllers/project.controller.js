@@ -149,3 +149,51 @@ export const close = async (req, res, next) => {
     return next(err);
   }
 };
+
+/**
+ * PUT /api/projects/:id/reopen
+ * Mở lại dự án (ADMIN).
+ */
+export const reopen = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!UUID_REGEX.test(id)) {
+      return badRequest(res, 'ID dự án không hợp lệ');
+    }
+
+    const project = await ProjectService.reopenProject(id);
+
+    return res.status(200).json({
+      success: true,
+      data: project,
+      message: 'Mở lại dự án thành công'
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+/**
+ * PUT /api/projects/:id/archive
+ * Đưa dự án vào lưu trữ (ADMIN).
+ */
+export const archive = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!UUID_REGEX.test(id)) {
+      return badRequest(res, 'ID dự án không hợp lệ');
+    }
+
+    const project = await ProjectService.archiveProject(id);
+
+    return res.status(200).json({
+      success: true,
+      data: project,
+      message: 'Đã đưa dự án vào lưu trữ'
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
